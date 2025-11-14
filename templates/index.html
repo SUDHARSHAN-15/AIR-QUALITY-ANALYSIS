@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AQI Sentinel - AI Air Quality Guardian</title>
+
+  <!-- Tailwind + Leaflet + Animate.css -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+  <!-- Google Font: Rajdhani (Military/Tech Feel) -->
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { background: #0a0a1a; color: #e0e0ff; font-family: 'Segoe UI', sans-serif; }
+    .title { font-family: 'Rajdhani', sans-serif; letter-spacing: 2px; }
+    .card { 
+      background: rgba(30, 30, 60, 0.7); 
+      backdrop-filter: blur(12px); 
+      border-radius: 20px; 
+      border: 1px solid rgba(100, 100, 255, 0.3); 
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .pulse { 
+      animation: pulse 2s infinite; 
+      border: 3px solid #ef4444;
+    }
+    @keyframes pulse { 
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 
+      50% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 
+    }
+    .map-container { height: 600px; border-radius: 16px; overflow: hidden; }
+    .cpcb-credit { font-size: 0.75rem; color: #666; text-align: center; margin-top: 2rem; }
+    .shap-img { transition: opacity 0.3s ease; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <div class="max-w-7xl mx-6 md:mx-auto py-8">
+    <!-- Header -->
+    <h1 class="title text-5xl md:text-7xl font-bold text-center mb-2 bg-gradient-to-r from-red-600 via-orange-500 to-cyan-400 bg-clip-text text-transparent animate__animated animate__pulse">
+      AQI SENTINEL
+    </h1>
+    <p class="text-center text-lg md:text-xl mb-10 opacity-80">
+      AI-Powered • 300+ CPCB Stations • Real-time AQI Guardian
+    </p>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+      <div class="card p-6 text-center pulse">
+        <h3 class="text-4xl font-bold text-red-400">
+          {{ (top5.values()|list|first)|round(0) }}
+        </h3>
+        <p class="text-gray-300">Worst PM2.5 Today</p>
+      </div>
+      <div class="card p-6 text-center animate__animated animate__fadeIn" style="animation-delay: 0.1s;">
+        <h3 class="text-4xl font-bold text-cyan-400">{{ total_cities }}</h3>
+        <p>Cities Monitored</p>
+      </div>
+      <div class="card p-6 text-center animate__animated animate__fadeIn" style="animation-delay: 0.2s;">
+        <h3 class="text-4xl font-bold text-green-400">LSTM + SHAP</h3>
+        <p>AI Engine</p>
+      </div>
+      <div class="card p-6 text-center animate__animated animate__fadeIn" style="animation-delay: 0.3s;">
+        <p class="text-cyan-300 text-lg">{{ timestamp }}</p>
+        <p class="text-xs text-gray-400">Last Updated</p>
+      </div>
+    </div>
+
+    <!-- Live Map -->
+    <div class="card p-6 mb-10 animate__animated animate__fadeInUp">
+      <h2 class="text-3xl font-bold mb-4 text-cyan-300 flex items-center">
+        Live AQI Map (300+ CPCB Stations)
+        <span class="ml-3 text-sm bg-green-600 text-white px-2 py-1 rounded-full animate-pulse">LIVE</span>
+      </h2>
+      <div class="map-container">
+        {{ map_html|safe }}
+      </div>
+      <p class="text-xs text-gray-400 mt-2 text-right">Data: CPCB CAAQMS (Updated 25-03-2019)</p>
+    </div>
+
+    <!-- Top 5 Polluted -->
+    <div class="card p-6 animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+      <h2 class="text-3xl font-bold mb-6 text-red-400">Top 5 Most Polluted Cities</h2>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {% for city, aqi in top5.items() %}
+        <div class="bg-red-900 bg-opacity-60 p-5 rounded-xl text-center transform transition hover:scale-105 cursor-pointer"
+             onclick="selectShapCity('{{ city|lower|replace(' ', '_') }}')">
+          <h3 class="font-bold text-lg text-pink-200">{{ city }}</h3>
+          <p class="text-3xl font-bold text-white">{{ aqi|round(0) }}</p>
+          <p class="text-xs text-red-300">PM2.5 µg/m³</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- AI Explainability (SHAP) -->
+    {% if shap_cities|length > 0 %}
+    <div class="card p-6 animate__animated animate__fadeInUp" style="animation-delay: 0.4s;">
+      <h2 class="text-3xl font-bold mb-4 text-yellow-400">AI Explainability (SHAP)</h2>
+      <p class="text-gray-300 mb-4">Click a city to see <strong>WHY</strong> AQI Sentinel predicts high/low PM2.5</p>
+      
+      <div class="flex flex-col md:flex-row gap-4 mb-4">
+        <select id="shap-select" class="bg-gray-800 text-white p-3 rounded-lg flex-1">
+          <option value="">Select a city...</option>
+          {% for city in shap_cities %}
+          <option value="{{ city|lower|replace(' ', '_') }}">{{ city }}</option>
+          {% endfor %}
+        </select>
+        <button onclick="refreshShap()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-lg font-semibold">
+          Load SHAP
+        </button>
+      </div>
+
+      <div id="shap-container" class="text-center">
+        <p class="text-gray-400 italic">Select a city to view AI explanation</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- CPCB Credit -->
+    <div class="cpcb-credit">
+      <p>
+        <strong>Source:</strong> Central Pollution Control Board (CPCB) | 
+        <a href="https://cpcb.nic.in" target="_blank" class="text-cyan-400 hover:underline">cpcb.nic.in</a> | 
+        Updated: 25-03-2019 | 
+        <span class="text-green-400">300+ CAAQMS Stations</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    function selectShapCity(cityKey) {
+      const select = document.getElementById('shap-select');
+      select.value = cityKey;
+      refreshShap();
+    }
+
+    function refreshShap() {
+      const cityKey = document.getElementById('shap-select').value;
+      const container = document.getElementById('shap-container');
+      
+      if (!cityKey) {
+        container.innerHTML = '<p class="text-gray-400 italic">Select a city to view AI explanation</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="flex justify-center items-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
+        </div>
+        <p class="text-cyan-300 mt-4">Loading SHAP for <strong>${cityKey.replace(/_/g, ' ').toUpperCase()}</strong>...</p>
+      `;
+
+      const img = new Image();
+      img.onload = () => {
+        container.innerHTML = `
+          <img src="/static/shap_${cityKey}.png" class="w-full rounded-xl shadow-2xl shap-img" alt="SHAP for ${cityKey}">
+          <p class="text-xs text-gray-400 mt-2">Red = Increases PM2.5 | Blue = Decreases PM2.5</p>
+        `;
+      };
+      img.onerror = () => {
+        container.innerHTML = '<p class="text-red-400">SHAP plot not available</p>';
+      };
+      img.src = `/static/shap_${cityKey}.png?t=${Date.now()}`;
+    }
+
+    window.onload = function() {
+      const firstCity = document.querySelector('#shap-select option[value]');
+      if (firstCity) {
+        firstCity.selected = true;
+        refreshShap();
+      }
+    };
+  </script>
+</body>
+</html>

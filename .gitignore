@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+air/
+
+# Data (too big)
+data/
+!data/processed/india_daily.csv
+!data/processed/india_hourly.csv
+!data/clustered/india_city_clusters.csv
+
+# Models (too big)
+models/lstm_pm25_anycity.h5
+models/scalers_anycity.pkl
+
+# Static SHAP plots (regenerate)
+static/shap_*.png
+
+# Jupyter
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
