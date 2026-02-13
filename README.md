@@ -213,7 +213,7 @@ Optimization Techniques:
 
 ## 1️⃣ Clone Repository
 
-git clone https://github.com/YOUR_USERNAME/AQI-Sentinel.git
+git clone [https://github.com/YOUR_USERNAME/AQI-Sentinel.git](https://github.com/SUDHARSHAN-15/AIR-QUALITY-ANALYSIS)
 cd AQI-Sentinel
 
 
@@ -278,5 +278,6 @@ AQI Sentinel can support:
  
 
 ---
+
 
 # ⭐ If you found this project insightful, consider giving it a star.
